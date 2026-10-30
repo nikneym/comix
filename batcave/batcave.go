@@ -116,25 +116,15 @@ func (g *Grabber) workerLoop(ctx context.Context, pages chan<- page, assets []st
 	}
 }
 
-// DownloadChapter downloads a chapter by URL.
-func (g *Grabber) DownloadChapter(ctx context.Context, u string) error {
+// writeChapterCBZ writes a chapter to given writer in CBZ format.
+// It is up to caller to close the writer if necessary. On error, the
+// CBZ written so far is left incomplete.
+func (g *Grabber) writeChapterCBZ(ctx context.Context, w io.Writer, assets []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	title, assets, err := g.chapterData(u)
-	if err != nil {
-		return err
-	}
-
-	out, err := os.Create(title + ".cbz")
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	cbzWriter := zip.NewWriter(out)
-	defer cbzWriter.Close()
-
+	cbzWriter := zip.NewWriter(w)
+	// Will be used as modified time of assets.
 	now := time.Now()
 
 	// Pages are received through this.
@@ -176,5 +166,34 @@ func (g *Grabber) DownloadChapter(ctx context.Context, u string) error {
 		}
 	}
 
-	return nil
+	// Writes the central directory; the archive is unreadable without it.
+	return cbzWriter.Close()
+}
+
+func (g *Grabber) DownloadChapter(ctx context.Context, u string) error {
+	title, assets, err := g.chapterData(u)
+	if err != nil {
+		return err
+	}
+
+	filename := title + ".cbz"
+	// Write to a temporary file and rename it on success, so a failed
+	// download neither leaves a partial CBZ behind nor replaces an existing one.
+	tmpname := filename + ".part"
+	out, err := os.Create(tmpname)
+	if err != nil {
+		return err
+	}
+
+	err = g.writeChapterCBZ(ctx, out, assets)
+	if closeErr := out.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Rename(tmpname, filename)
+	}
+	if err != nil {
+		_ = os.Remove(tmpname)
+	}
+	return err
 }
