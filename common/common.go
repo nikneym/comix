@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -26,15 +25,4 @@ func ImageExtFromMimeType(mime string) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown MIME: %s", mime)
 	}
-}
-
-// UnescapeJSON decodes JSON escapes left in s by APIs that double-encode
-// strings (e.g. `\/` -> `/`, `é` -> `é`). Returns s unchanged if it
-// isn't a valid JSON string body.
-func UnescapeJSON(s string) string {
-	var out string
-	if err := json.Unmarshal([]byte(`"`+s+`"`), &out); err != nil {
-		return s
-	}
-	return out
 }
