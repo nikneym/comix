@@ -138,7 +138,6 @@ func (g *Grabber) writeChapterCBZ(ctx context.Context, w io.Writer, assets []str
 		go g.workerLoop(ctx, pages, assets, &index)
 	}
 
-	// Write to CBZ file.
 	for range len(assets) {
 		select {
 		// Got a new page.
